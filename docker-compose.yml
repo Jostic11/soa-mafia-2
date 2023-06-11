@@ -1,0 +1,88 @@
+version: '3.7'
+
+volumes:
+  mongodb_volume:
+
+networks:
+  main:
+
+services:
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: 'soa-server'
+    restart: always
+    ports:
+      - "8000:8000"
+    depends_on:
+      - rabbitmq
+      - mongodb
+    networks:
+      - main
+
+  mongodb:
+    image: mongo:latest
+    container_name: 'mongodb'
+    volumes:
+      - mongodb_volume:/data/db
+    restart: always
+    environment:
+      MONGO_INITDB_DATABASE: admin
+      MONGO_INITDB_ROOT_USERNAME: ${DB_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - 27017:27017
+    networks:
+      - main
+
+  # celery-worker:
+  #   build: 
+  #     context: ./server
+  #   env_file:
+  #     - .env
+  #   container_name: 'celery-worker'
+  #   restart: always
+  #   command: ['celery', '-A', 'index.celery', 'worker', '-c', '1', '-Q', 'celery', '-l', 'info']
+  #   environment:
+  #     - BROKER_URL=amqp://${RABBITMQ_USERNAME}:${RABBITMQ_PASSWORD}@rabbitmq:5672
+  #     - RESULT_BACKEND=mongodb://${DB_USERNAME}:${DB_PASSWORD}@mongodb:27017/admin
+  #   volumes:
+  #     - ./server:/app/server
+  #   depends_on:
+  #     - rabbitmq
+  #     - mongodb
+  #   networks:
+  #     - main
+      
+  # flower:
+  #   build: 
+  #     context: ./server
+  #   env_file:
+  #     - .env
+  #   container_name: 'flower'
+  #   restart: always
+  #   command: ['celery', '-A', 'index.celery', 'flower']
+  #   ports:
+  #     - 5555:5555
+  #   depends_on:
+  #     - celery-worker
+  #     - mongodb
+  #     - rabbitmq
+  #   networks:
+  #     - main
+
+  rabbitmq:
+    image: rabbitmq:3.11-management
+    container_name: 'rabbitmq'
+    restart: always
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      - RABBITMQ_DEFAULT_USER=${RABBITMQ_USERNAME}
+      - RABBITMQ_DEFAULT_PASS=${RABBITMQ_PASSWORD}
+    networks:
+      - main
+    depends_on:
+      - mongodb
