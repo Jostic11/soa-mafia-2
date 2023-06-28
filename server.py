@@ -37,13 +37,17 @@ class MafiaService(mafia_pb2_grpc.MafiaServicer):
         self.credentials = pika.PlainCredentials(os.environ["RABBITMQ_USERNAME"], os.environ["RABBITMQ_PASSWORD"])
         self.parameters = pika.ConnectionParameters(host='rabbitmq', port=5672, credentials=self.credentials, heartbeat=600,
                                        blocked_connection_timeout=300)
-        self.connection = pika.BlockingConnection(parameters=self.parameters)
-        self.channel = self.connection.channel()
 
     def ConnectToTheChat(self, game_id):
+        # try:
+        self.connection = pika.BlockingConnection(parameters=self.parameters)
+        self.channel = self.connection.channel()
+        self.channel.queue_declare(queue=game_id)
         for method_frame, properties, body in self.channel.consume(game_id):
             self.notifications[game_id].append(f"__MSG__ {body.decode()}")
             self.channel.basic_ack(delivery_tag = method_frame.delivery_tag)
+        # except Exception as e:
+        #     pass
 
     def wait_all(self, game_id):
         with self.lock[game_id]:
@@ -209,8 +213,8 @@ class MafiaService(mafia_pb2_grpc.MafiaServicer):
             self.wait_users[request.game_id] = 0
             self.wait_users_unlock[request.game_id] = 0
             self.lock[request.game_id] = Lock()
-            self.channel.queue_declare(queue=request.game_id)
-            self.chats[request.game_id] = Thread(target=self.ConnectToTheChat)
+            # self.channel.queue_declare(queue=request.game_id)
+            self.chats[request.game_id] = Thread(target=self.ConnectToTheChat, args=[request.game_id])
             self.chats[request.game_id].start()
         self.users_room[request.name] = request.game_id
         self.users_notification[request.name] = len(self.notifications[request.game_id])
@@ -239,7 +243,7 @@ class MafiaService(mafia_pb2_grpc.MafiaServicer):
             self.wait_users[request.game_id] = 0
             self.wait_users_unlock[request.game_id] = 0
             self.lock[request.game_id] = Lock()
-            self.channel.queue_declare(queue=request.game_id)
+            # self.channel.queue_declare(queue=request.game_id)
             self.chats[request.game_id] = Thread(target=self.ConnectToTheChat, args=[request.game_id])
             self.chats[request.game_id].start()
         self.users_room[request.name] = request.game_id
